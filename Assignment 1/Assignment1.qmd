@@ -4,8 +4,8 @@ author: "Hanin Almodaweb"
 format: html
 theme: journal
 embed-resources: true
-fig-width: 6
-fig-height: 4
+fig-width: 10
+fig-height: 6
 ---
 
 ```{r setup, message=FALSE, echo=FALSE, warning=FALSE}
@@ -14,13 +14,14 @@ library(data.table)
 library(dplyr)
 library(leaflet)
 library(tidyverse)
+library(ggplot2)
 ```
 
-# Assignment Description
+## Assignment Description
 
 We will work with air pollution data from the U.S. Environmental Protection Agency (EPA). The EPA has a national monitoring network of air pollution sites that The primary question you will answer is whether daily concentrations of PM$_{2.5}$ (particulate matter air pollution with aerodynamic diameter less than 2.5 $\mu$m) have decreased in California over the last 20 years (from 2002 to 2022).
 
-# Steps
+### Steps
 
 1. Given the formulated question from the assignment description, you will now conduct EDA Checklist items 2-4. First, download 2002 and 2022 data for all sites in California from the [EPA Air Quality Data website](https://www.epa.gov/outdoor-air-quality-data/download-daily-data). Read in the data using `data.table()`. For each of the two datasets, check the dimensions, headers, footers, variable names and variable types. Check for any data issues, particularly in the key variable we are analyzing. Make sure you write up a summary of all of your findings.
 
@@ -28,61 +29,82 @@ We will work with air pollution data from the U.S. Environmental Protection Agen
 # reading data into R
 EPA2002 <- data.table::fread("/Users/neens/Downloads/ad_viz_plotval_data.csv")
 EPA2022 <- data.table::fread("/Users/neens/Downloads/ad_viz_plotval_data-2.csv")
+```
 
-# checking dimensions, headers, footers for the 2002 dataset
+```{r}
+# checking the california 2002 data set 
 dim(EPA2002)
 head(EPA2002)
 tail(EPA2002)
 
-# checking dimensions, headers, footers for the 2022 dataset
+# checking variable names and variable types for the 2002 data set
+str(EPA2002)
+
+# checking for data issues
+# all variables
+summary(EPA2002)
+
+# daily Mean PM2.5 Concentration variable
+summary(EPA2002$`Daily Mean PM2.5 Concentration`)
+
+# missing values
+anyNA(EPA2002)
+mean(is.na(EPA2002$`Daily Mean PM2.5 Concentration`))
+```
+
+##### Summary of 2002 Findings
+The 2002 data set consists of 15,976 rows and 22 columns (variables), with no apparent missing data in the headers or footers. Initial checks of the data structure indicated a mix of character, integer, and numeric data types. The variable names include *Date*, *Source*, *Site ID*, *POC*, *Daily Mean PM$_{2.5}$ Concentration*, *Units*, *Daily AQI Value*, *Local Site Name*, *Daily Obs Count*, *Percent Complete*, *AQS Parameter Code*, *Parameter Description*, *Method Code*, *Method Description*, *CBSA Code*, *CBSA Name*, *State FIPS Code*, *State*, *County FIPS Code*, *County*, *Site Latitude*, and *Site Longitude*. The character variables of interest are date, state, and county. While te numerical variables under study are daily mean PM2.5 concentration, site latitude, and site longitude.
+
+Upon examining the data, the majority of the *Daily Mean PM$_{2.5}$ Concentration* values range between 0 and 104.3 µg/m³, with a mean of 16.12 µg/m³, a median of 12 µg/m³, and a maximum value of 185 µg/m³. There are no missing values in the *Daily Mean PM$_{2.5}$ Concentration* column, ensuring the key variable of interest is complete for analysis. Nonetheless, while the data set was mostly complete, the presence of missing values requires further investigation to ensure data quality. A closer examination of missing data patterns and potential outliers, particularly in the PM$_{2.5}$ measurements, is necessary to identify any inconsistencies. 
+
+```{r}
+# checking the california 2022 data set 
 dim(EPA2022)
 head(EPA2022)
 tail(EPA2022)
 
-# checking variable names and variable types for the 2002 dataset
-str(EPA2002)
-
-# checking variable names and variable types for the 2022 dataset
+# checking variable names and variable types for the 2022 data set
 str(EPA2022)
 
-# checking for data issues in both datasets 
-# key variables
-summary(EPA2002)
+# checking for data issues 
+# all variables
 summary(EPA2022)
 
+# daily Mean PM2.5 Concentration variable
+summary(EPA2022$`Daily Mean PM2.5 Concentration`)
+
 # missing values
-# Check for any missing data in EPA2002 and EPA2022
-anyNA(EPA2002)
 anyNA(EPA2022)
+mean(is.na(EPA2022$`Daily Mean PM2.5 Concentration`))
 ```
 
-## Summary of Findings
-
+##### Summary of 2022 Findings
+The 2022 data set contains 59,756 rows and 22 columns (variables), with the headers and footers loaded correctly. There is evidence of missing data, though not the main variable of interest, Daily Mean PM$_{2.5}$ Concentration. The variable names and types remain consistent with the 2002 data set. Observations show that the majority of the Daily Mean PM$_{2.5}$ Concentration values range from -6.7 to 302.5 µg/m³, with a mean of 8.43 µg/m³, a median of 6.8 µg/m³, and a maximum of 302.5 µg/m³. However, it is worth noting that it is unusual for PM$_{2.5}$ concentrations to have negative values, as particulate matter is a physical measurement of pollution in the air. A negative value might indicate an issue with the data collection, sensor calibration, or data processing.
 
 2. Combine the two years of data into one data frame. Use the Date variable to create a new column for year, which will serve as an identifier. Change the names of the key variables so that they are easier to refer to in your code.
 
-```{r} 
-# convert date to date format
-EPA2002$Date <- as.Date(EPA2002$Date, format = "%m/%d/%Y")
-EPA2022$Date <- as.Date(EPA2022$Date, format = "%m/%d/%Y")
-
-# create a 'Year' column from the date
-EPA2002$Year <- format(EPA2002$Date, "%Y")
-EPA2022$Year <- format(EPA2022$Date, "%Y")
-
-# rename the columns of key variables
-setnames(EPA2002, old = c("Daily Mean PM2.5 Concentration", "Daily AQI Value", 
-                          "Site ID", "Site Latitude", "Site Longitude"), 
-                 new = c("PM2_5", "AQI", "Site_ID", "Latitude", "Longitude"))
-
-setnames(EPA2022, old = c("Daily Mean PM2.5 Concentration", "Daily AQI Value", 
-                          "Site ID", "Site Latitude", "Site Longitude"), 
-                 new = c("PM2_5", "AQI", "Site_ID", "Latitude", "Longitude"))
-
-# combine the two datasets
+```{r}
+# combining the two data sets
 EPA_combined <- rbind(EPA2002, EPA2022, fill = TRUE)
+```
 
-# checking the new dataset
+```{r}
+# converting date to date format
+EPA_combined$Date <- as.Date(EPA_combined$Date, format = "%m/%d/%Y")
+
+# creating a 'Year' column from the date
+EPA_combined$Year <- format(EPA_combined$Date, "%Y")
+```
+
+```{r}
+# renaming the columns of key variables
+setnames(EPA_combined, old = c("Daily Mean PM2.5 Concentration", "Daily AQI Value", 
+                          "Site ID", "Site Latitude", "Site Longitude"), 
+                 new = c("PM2.5", "AQI", "Site_ID", "Latitude", "Longitude"))
+```
+
+```{r} 
+# checking the new data set
 summary(EPA_combined)
 head(EPA_combined)
 tail(EPA_combined)
@@ -91,21 +113,21 @@ tail(EPA_combined)
 3. Create a basic map in leaflet() that shows the locations of the sites (make sure to use different colors for each year). Summarize the spatial distribution of the monitoring sites.
 
 ```{r}
-# ensure the data is in the correct format
+# ensuring the data is in the correct format
 EPA_combined$Year <- as.numeric(EPA_combined$Year)
 
-# define a color palette for the years (2002 and 2022)
-palette <- colorFactor(palette = c("coral", "pink"), domain = EPA_combined$Year)
+# defining a color palette for the years (2002 and 2022)
+palette <- colorFactor(palette = c("turquoise", "pink"), domain = EPA_combined$Year)
 
-# create the leaflet map
+# creating the leaflet map
 leaflet(EPA_combined) %>%
-  addTiles() %>%  # Add default OpenStreetMap tiles
+  addTiles() %>%  
   addCircleMarkers(
     ~Longitude, ~Latitude,  # Set the longitude and latitude
     color = ~palette(Year), # Use different colors for each year
     popup = ~paste("Site ID:", Site_ID, "<br>", 
                    "Year:", Year, "<br>",
-                   "PM2.5:", PM2_5, "<br>",
+                   "PM2.5:", PM2.5, "<br>",
                    "AQI:", AQI),  # Popup information
     radius = 5, fillOpacity = 0.8, stroke = FALSE
   ) %>%
@@ -118,21 +140,23 @@ leaflet(EPA_combined) %>%
   )
 ```
 
-## Summary of the spatial distribution of the monitoring sites
+
+##### Summary of the spatial distribution of the monitoring sites
+In 2002, monitoring sites were mainly concentrated around major cities like Los Angeles, San Francisco, and Sacramento, with less coverage in central and eastern regions. By 2022, the number of monitoring sites increased, especially in previously underrepresented areas, indicating an expansion of air quality monitoring infrastructure over the two decades.
 
 4. Check for any missing or implausible values of PM$_{2.5}$ in the combined dataset. Explore the proportions of each and provide a summary of any temporal patterns you see in these observations.
 
-```{r EDIT}
-# check for missing values in PM2.5
-missing_PM25 <- EPA_combined[is.na(PM2_5), .N]
+```{r}
+# checking for missing values in PM2.5
+missing_PM25 <- EPA_combined[is.na(PM2.5), .N]
 
-# check for implausible values (e.g., negative values or values above 500)
-implausible_PM25 <- EPA_combined[PM2_5 < 0 | PM2_5 > 500, .N]
+# checking for implausible values (e.g., negative values or values above 500 ug/m^3 (as given by the 2012 EPA) 
+implausible_PM25 <- EPA_combined[PM2.5 < 0 | PM2.5 > 500, .N]
 
 # total number of observations
 total_obs <- nrow(EPA_combined)
 
-# calculate proportions of missing and implausible values
+# calculating proportions of missing and implausible values
 prop_missing <- missing_PM25 / total_obs
 prop_implausible <- implausible_PM25 / total_obs
 
@@ -141,40 +165,197 @@ cat("Total Observations:", total_obs, "\n")
 cat("Missing PM2.5 Values:", missing_PM25, "(", round(prop_missing * 100, 2), "% )\n")
 cat("Implausible PM2.5 Values:", implausible_PM25, "(", round(prop_implausible * 100, 2), "% )\n")
 
-# explore temporal patterns in missing and implausible values
-missing_by_year <- EPA_combined[is.na(PM2_5), .N, by = Year]
-implausible_by_year <- EPA_combined[PM2_5 < 0 | PM2_5 > 500, .N, by = Year]
-
-# display the missing and implausible values by year
+# exploring temporal patterns in missing and implausible values
+missing_by_year <- EPA_combined[is.na(PM2.5), .N, by = Year]
+implausible_by_year <- EPA_combined[PM2.5 < 0 | PM2.5 > 500, .N, by = Year]
+```
+```{r}
+# displaying the missing and implausible values by year
 missing_by_year
 implausible_by_year
+
+# examining frequency of implausible values by month
+implausible_values <- subset(EPA_combined, PM2.5 < 0 | PM2.5 > 500)
+
+# extracting month from the Date column
+implausible_values$Month <- format(as.Date(implausible_values$Date), "%Y-%m")
+
+# creating a table or summary of the count of implausible values by month
+implausible_by_month <- table(implausible_values$Month)
+
+# converting to a data frame for easier plotting or viewing
+implausible_by_month_df <- as.data.frame(implausible_by_month)
+
+# view the distribution
+print(implausible_by_month_df)
 ```
 
-## Summary of temporal patterns
+
+##### Summary of temporal patterns
+The combined dataset has a total of 75,732 observations with no missing values for PM$_{2.5}$, as shown by a missing proportion of 0%. However, there are 215 implausible values (0.28%), defined as PM$_{2.5}$ concentrations less than 0 or greater than 500, as given by the 2012 EPA. Temporal analysis of these implausible values reveals that all implausible values occurred in 2022, with no such values found in 2002. Delving into the monthly frequencies in which PM$_{2.5}$ implausible values were recorded, the values were distributed throughout the year, with the highest occurrences in December (46 values) and July (27 values), while April and October had the fewest (4 values each).
 
 5. Explore the main question of interest at three different spatial levels. Create exploratory plots (e.g. boxplots, histograms, line plots) and summary statistics that best suit each level of data. Be sure to write up explanations of what you observe in these data.
-    - state
-```{r EDIT}
 
+- State
+```{r}
+# sub-setting for California data
+california_data <- EPA_combined[State == "California"]
+
+# summary statistics for PM2.5 in California across years
+summary_stats_state <- california_data %>%
+  group_by(Year) %>%
+  summarize(
+    mean_PM2.5 = mean(PM2.5, na.rm = TRUE),
+    median_PM2.5 = median(PM2.5, na.rm = TRUE),
+    sd_PM2.5 = sd(PM2.5, na.rm = TRUE),
+    min_PM2.5 = min(PM2.5, na.rm = TRUE),         
+    max_PM2.5 = max(PM2.5, na.rm = TRUE),         
+    count = n()   
+  )
+
+# printing the summary statistics
+print(summary_stats_state)
+
+# histogram of PM2.5 by year
+ggplot(data = california_data) + 
+  geom_histogram(aes(x = PM2.5, fill = as.factor(Year)), 
+                 position = "identity", alpha = 0.6, binwidth = 2) +
+  labs(title = "PM2.5 by Year in California", x = "Daily Mean PM2.5 Concentration (µg/m³)", 
+       fill = "Year") +
+  theme_minimal()
+        
+# boxplot of PM2.5 by year
+ggplot(california_data, aes(x = as.factor(Year), y = PM2.5)) +
+  geom_boxplot(fill = "pink", color = "purple", alpha = 0.7) +
+  labs(title = "PM2.5 Concentrations by Year in California (2002-2022)",
+       x = "Year",
+       y = "Daily Mean PM2.5 Concentration (µg/m³)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# creating a summary data.table for highlighted years
+highlight_years <- california_data[Year %in% c(2002, 2022), .(Mean_PM2.5 = mean(PM2.5, na.rm = TRUE)), by = Year]
+
+# creating the line plot
+ggplot(california_data, aes(x = Year, y = PM2.5)) +
+  # Line plot for average PM2.5 using linewidth
+  geom_line(stat = "summary", fun = mean, color = "pink", linewidth = 1) +
+  # adding points for highlighted years
+  geom_point(data = highlight_years, aes(x = Year, y = Mean_PM2.5), 
+             size = 3, color = "purple", fill = "purple", shape = 21) +
+  # adding circles around the points for emphasis
+  geom_point(data = highlight_years, aes(x = Year, y = Mean_PM2.5), 
+             size = 6, color = "purple", shape = 1) +
+  labs(title = "Average PM2.5 Concentration Over Time in California (2002-2022)",
+       x = "Year",
+       y = "Average Daily Mean PM2.5 (µg/m³)") +
+  theme_minimal()
 ```
 
-## Summary of observations
+##### Summary of observations
+The data indicates a significant decrease in daily PM$_{2.5}$ concentrations in California from 2002 to 2022. The mean concentration dropped from 16.12 μg/m³ to 8.43 μg/m³, showing nearly a 50% reduction. The spread of values also narrowed, suggesting fewer extreme pollution days. While 2022 still had occasional high pollution events, overall air quality improved markedly, with most days showing much lower PM2.5 levels compared to 2002. This trend reflects advancements in air quality management and pollution control measures over the past two decades.
 
+- County
+```{r}
+# summary statistics for PM2.5 by counties in California across years 
+summary_stats_county <- EPA_combined %>%
+  group_by(County, Year) %>%
+  summarize(
+    mean_PM2.5 = mean(PM2.5, na.rm = TRUE),
+    median_PM2.5 = median(PM2.5, na.rm = TRUE),
+    sd_PM2.5 = sd(PM2.5, na.rm = TRUE),
+    min_PM2.5 = min(PM2.5, na.rm = TRUE),         
+    max_PM2.5 = max(PM2.5, na.rm = TRUE),         
+    count = n(),                                   
+    .groups = "drop"  # Add this line to control grouping behavior
+  ) %>%
+  arrange(County, Year)
 
-    - county
-```{r EDIT}
+# printing the summary statistics
+print(summary_stats_county)
 
+# ensuring 'Year' is treated as a factor
+EPA_combined$Year <- as.factor(EPA_combined$Year)
+
+# creating a bar plot
+ggplot(data = EPA_combined, aes(x = County, y = PM2.5, fill = Year)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  scale_fill_manual(values = c("2002" = "turquoise", "2022" = "pink")) +
+  labs(title = "PM2.5 Trends by County (2002 vs 2022)",
+       x = "County",
+       y = "Mean Daily PM2_5 (µg/m³)",
+       fill = "Year") +
+  coord_flip()
 ```
 
-## Summary of observations
+##### Summary of observations
+From 2002 to 2022, air quality in California's counties, measured by PM$_{2.5}$ levels, generally improved significantly. For example, Alameda County saw a reduction in mean PM$_{2.5}$ from 14.25 µg/m³ to 8.20 µg/m³, and Butte County's mean decreased from 14.76 µg/m³ to 6.19 µg/m³. Similar downward trends were observed across counties, such as Fresno, where PM$_{2.5}$ levels dropped from 19.93 µg/m³ to 10.19 µg/m³. The decrease in both mean and maximum PM$_{2.5}$ values indicates improved air quality, although variability persisted in some areas with occasional spikes, such as Trinity and Placer counties. Overall, air quality across the state showed marked improvements, with fewer high pollution days over the 20-year period.
 
+- Sites in Los Angeles
+```{r}
+# sub-setting Los Angeles site data
+la_data <- EPA_combined[County == "Los Angeles"]
 
-    - sites in Los Angeles
-```{r EDIT}
+# summary statistics for PM2.5 in Los Angeles sites across years
+summary_stats_la <- la_data %>%
+  group_by(Year) %>%
+  summarize(
+    mean_PM2.5 = mean(PM2.5, na.rm = TRUE),
+    median_PM2.5 = median(PM2.5, na.rm = TRUE),
+    sd_PM2.5 = sd(PM2.5, na.rm = TRUE),
+    n = n()
+  )
 
+# printing the summary statistics
+print(summary_stats_la)
+
+# histogram of PM2.5 in Los Angeles sites
+ggplot(la_data, aes(x = PM2.5, fill = Year)) +
+  geom_histogram(binwidth = 2, color = "pink", alpha = 0.7, position = "identity") +
+  labs(title = "Distribution of Daily Mean PM2.5 Concentrations at Los Angeles sites (2002-2022)",
+       x = "Daily Mean PM2.5 Concentration (µg/m³)",
+       y = "Frequency") +
+  scale_fill_manual(values = c("2002" = "turquoise", "2022" = "pink")) + # Custom colors for each year
+  theme_minimal() +
+  theme(legend.position = "top")
+
+# loading gridExtra library 
+library(gridExtra)
+
+# Splitting data into 2002 and 2022 subsets
+  LA_2002 <- subset(la_data, Year == 2002)
+  LA_2022 <- subset(la_data, Year == 2022)
+  
+# Ensure correct handling of dates (adding the year manually)
+LA_2002$Date <- as.Date(paste("2002", format(LA_2002$Date, "%m-%d"), sep = "-"))
+LA_2022$Date <- as.Date(paste("2022", format(LA_2022$Date, "%m-%d"), sep = "-"))
+
+# Check if dates are ordered correctly
+LA_2002 <- LA_2002[order(LA_2002$Date), ]
+LA_2022 <- LA_2022[order(LA_2022$Date), ]
+
+# Plotting PM2.5 levels for 2002
+plot_2002 <- ggplot(LA_2002, aes(x = Date, y = PM2.5)) +
+  geom_line(color = "turquoise") +
+  geom_point(color = "turquoise") +
+  scale_x_date(date_labels = "%b", date_breaks = "1 month") +  # Set month labels
+  labs(title = "Change in PM2.5 in Los Angeles in 2002", x = "Month in 2002", y = "Daily Mean PM2.5 Concentration (µg/m³)") +
+  theme_minimal()
+
+# Plotting PM2.5 levels for 2022
+plot_2022 <- ggplot(LA_2022, aes(x = Date, y = PM2.5)) +
+  geom_line(color = "pink") +
+  geom_point(color = "pink") +
+  scale_x_date(date_labels = "%b", date_breaks = "1 month") +  # Set month labels
+  labs(title = "Change in PM2.5 in Los Angeles in 2022", x = "Month in 2022", y = "Daily Mean PM2.5 Concentration (µg/m³)") +
+  theme_minimal()
+
+# Arrange both plots side-by-side
+grid.arrange(plot_2002, plot_2022, ncol = 2)
 ```
 
-## Summary of observations
 
+##### Summary of observations
+In Los Angeles County, the air quality significantly improved from 2002 to 2022, as indicated by a decrease in PM$_{2.5}$ levels. In 2002, the mean PM$_{2.5}$ was 19.66 µg/m³, with a median of 17.4 µg/m³, and a standard deviation of 11.88 µg/m³, based on 1,879 observations. By 2022, the mean PM$_{2.5}$ had dropped to 10.97 µg/m³, with a median of 10.3 µg/m³ and a standard deviation of 5.24 µg/m³, based on a larger dataset of 5,070 observations. 
 
   
