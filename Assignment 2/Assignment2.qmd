@@ -18,6 +18,7 @@ library(tidyverse)
 library(ggplot2)
 library(viridis)
 library(RColorBrewer)
+library(knitr)
 ```
 
 ## Loading and Merging the Datasets
@@ -115,7 +116,7 @@ obesity_summary_table <- merged_data %>%
   )
 
 # display the summary table
-print(obesity_summary_table)
+kable(obesity_summary_table)
 ```
 
 <span style="color: coral;"> There are 975 individuals in the normal category, 103 in the obese category, 87 in the overweight category, and 35 in the underweight category. Summed up, this is 1200, meaning that all observations were accounted for. The minimum and maximum of each obesity level also follow the cut-off values accordingly. </span>
@@ -139,7 +140,7 @@ smoke_summary_table <- merged_data %>%
     count = n())
 
 # display the summary table
-print(smoke_summary_table)
+kable(smoke_summary_table)
 ```
 
 <span style="color: coral;"> The dataset reveals that the majority of individuals (791) were exposed to gas stove emissions only, while a smaller group of 154 individuals experienced both smoke and gas stove exposure. Additionally, 219 individuals had no exposure to either, and the smallest group, comprising just 36 individuals, was exposed solely to smoke. These totals sum to 1,200, confirming that all observations are accounted for. </span>
@@ -161,10 +162,13 @@ generate_summary <- function(group_var) {
 # variables to group by
 group_vars <- c("townname", "male", "obesity_level", "smoke_gas_exposure")
 
-# loop through each grouping variable and generate summary table
+# loop through each grouping variable and generate summary tables
 summary_tables <- lapply(group_vars, function(var) {
+  summary_table <- generate_summary(var)
+  
+# print the summary table
   cat("\nSummary by", var, ":\n")
-  print(generate_summary(var))
+  print(kable(summary_table))  # Use print() to display the table in some contexts
 })
 ```
 
