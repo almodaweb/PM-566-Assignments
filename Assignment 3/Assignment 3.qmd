@@ -1,0 +1,277 @@
+---
+title: "Assignment 3"
+author: "Hanin Almodaweb"
+format: html
+theme: journal
+embed-resources: true
+fig-width: 10
+fig-height: 6
+---
+
+```{r setup, message=FALSE, echo=FALSE, warning=FALSE}
+# install and load packages
+options(repos = c(CRAN = "https://cloud.r-project.org/"))
+
+library(tidytext)
+library(dplyr)
+library(ggplot2)
+library(data.table)
+library(tidyr)
+library(DT)
+```
+
+## Text Mining
+
+```{r}
+# reading data into R
+abstracts <- read.csv("/Users/neens/Desktop/pubmed.csv")
+```
+
+1.  Tokenize the abstracts and count the number of each token. Do you see anything interesting? Does removing stop words change what tokens appear as the most frequent? What are the 5 most common tokens for each search term after removing stopwords?
+
+```{r}
+# Tokenize the abstracts and retain the term column
+tokenized_abstracts <- abstracts %>%
+  unnest_tokens(word, abstract)
+
+# Count the number of each token
+token_counts <- tokenized_abstracts %>%
+  count(word, sort = TRUE)
+
+# View the 10 most frequent tokens before removing stopwords
+# Create a DataTable to display the top 10 tokens
+top_10_tokens <- head(token_counts, 10)
+
+# Display the top 10 tokens with DataTable
+datatable(top_10_tokens, 
+          class = 'cell-border stripe',
+          options = list(pageLength = 10,         
+                         lengthMenu = c(5, 10, 20, 50), 
+                         searching = TRUE,      
+                         ordering = TRUE))
+
+# Get the top 20 most frequent words
+top_20_words <- token_counts %>%
+  slice_max(n, n = 20) # Get the top 20 words
+
+# Create the plot for the top 20 most frequent words
+top_20_words |>
+  ggplot(aes(n, word)) +
+  geom_col(fill = "purple") +
+  labs(title = "Top 20 Most Frequent Words (Including Stopwords)",
+       x = "Count",
+       y = "Word") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))
+
+# Remove stopwords
+data("stop_words")
+token_counts_no_stopwords <- tokenized_abstracts %>%
+  anti_join(stop_words, by = "word") %>%
+  count(term, word, sort = TRUE)
+
+# Get the top 20 most frequent words without stopwords
+top_20_words_no_stopwords <- token_counts_no_stopwords %>%
+  slice_max(n, n = 20) # Get the top 20 words
+
+# Create the plot for the top 20 most frequent words without stopwords
+top_20_words_no_stopwords |>
+  ggplot(aes(n, word)) +
+  geom_col(fill = "purple") +
+  labs(title = "Top 20 Most Frequent Words (Without Stopwords)",
+       x = "Count",
+       y = "Word") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))
+
+# View the 5 most frequent tokens after removing stopwords (by term)
+top_tokens_by_term <- token_counts_no_stopwords %>%
+  group_by(term) %>%
+  slice_max(n, n = 5) %>%
+  arrange(term, desc(n))
+
+# Display the top tokens for each search term
+datatable(top_tokens_by_term, 
+          class = 'cell-border stripe',
+          options = list(pageLength = 10,         
+                         lengthMenu = c(5, 10, 20, 50), 
+                         searching = TRUE,      
+                         ordering = TRUE))
+```
+
+Before removing stopwords, the most common tokens across all abstracts are high-frequency, generic words like “the,” “of,” “and,” “in,” and “to,” which don’t provide meaningful content insights. However, once these stopwords are removed, the top tokens reveal distinct, domain-specific themes within each search term. For instance, in the **COVID-198** category, terms such as “covid,” “patients,” “disease,” and “pandemic” are predominant, reflecting a focus on patient care and the broader impact of the pandemic. In abstracts about **cystic fibrosis**, frequent terms like “fibrosis,” “cystic,” “cf,” “patients,” and “disease” highlight discussions around patient experiences and disease management. Similarly, for **meningitis**, terms such as “patients,” “meningeal,” “csf,” and “clinical” emphasize the clinical aspects of treatment and cerebrospinal fluid analysis. **Preeclampsia**-related abstracts are dominated by terms like “preeclampsia,” “eclampsia,” “women,” and “pregnancy,” underscoring an emphasis on maternal health and pregnancy outcomes. Lastly, in **prostate cancer** abstracts, words like “cancer,” “prostate,” “patients,” “treatment,” and “disease” point to research focused on treatment and disease characteristics. This targeted breakdown, achievable only after removing stopwords, offers a clearer view of each topic's thematic focus, with terms tailored to their respective medical conditions.
+
+2.  Tokenize the abstracts into bigrams. Find the 10 most common bigrams and visualize them with ggplot2.
+
+```{r}
+# Tokenize the abstracts into bigrams
+bigrams_data <- abstracts %>%
+  unnest_tokens(bigram, abstract, token = "ngrams", n = 2)
+
+# Count the number of each bigram
+bigram_counts <- bigrams_data %>%
+  count(bigram, sort = TRUE)
+
+# View the 10 most common bigrams
+top_bigrams <- head(bigram_counts, 10)
+
+# Display the top 10 bigrams with DataTable
+datatable(top_bigrams, 
+          class = 'cell-border stripe',
+          options = list(pageLength = 10,         
+                         lengthMenu = c(5, 10, 20, 50), 
+                         searching = TRUE,      
+                         ordering = TRUE))
+
+
+# Visualize the top 10 bigrams using ggplot2
+ggplot(top_bigrams, aes(x = reorder(bigram, n), y = n)) +
+  geom_bar(stat = "identity", fill = "lavender") +
+  coord_flip() +  # Flip coordinates for better readability
+  labs(title = "Top 10 Bigrams in PubMed Abstracts",
+       x = "Bigrams",
+       y = "Count") +
+  theme_minimal()
+```
+
+3.  Calculate the TF-IDF value for each word-search term combination (here you want the search term to be the "document"). What are the 5 tokens from each search term with the highest TF-IDF value? How are the results different from the answers you got in question 1?
+
+```{r}
+# Calculate TF-IDF
+tf_idf_data <- tokenized_abstracts %>%
+  count(term, word) %>%
+  bind_tf_idf(word, term, n)
+
+# Get top 5 tokens by TF-IDF for each search term
+top_tf_idf <- tf_idf_data %>%
+  group_by(term) %>%
+  slice_max(tf_idf, n = 5) %>%  # Use slice_max instead of top_n for clarity
+  arrange(term, desc(tf_idf))
+
+# Display the top TF-IDF tokens
+datatable(top_tf_idf, 
+          class = 'cell-border stripe',
+          options = list(pageLength = 10,         
+                         lengthMenu = c(5, 10, 20, 50), 
+                         searching = TRUE,      
+                         ordering = TRUE))
+```
+
+For **COVID-19**, the top five overall words identified were "covid," "19," "patients," "disease," and "pandemic." In the TF-IDF analysis, "covid" and "pandemic" remain prominent, but they are joined by additional relevant terms such as "coronavirus," "sars," and "cov." This shift highlights a focus on specific aspects of the COVID-19 pandemic.
+
+For **cystic fibrosis**, the initial top five words were "fibrosis," "cystic," "cf," "patients," and "disease." The TF-IDF analysis retains "cf," "fibrosis," and "cystic" among the top terms, while introducing "cftr" and "sweat," emphasizing key biological markers and patient-related topics in the literature.
+
+In the **meningitis** abstracts, the top five overall words included "patients," "meningitis," "meningeal," "csf," and "clinical." The TF-IDF analysis confirms "meningitis," "meningeal," and "csf" as significant terms, adding "pachymeningitis" and "meninges," which are more specialized terms related to the condition.
+
+For **preeclampsia**, the most frequent words were "pre," "eclampsia," "preeclampsia," "women," and "pregnancy." In the TF-IDF results, "eclampsia," "preeclampsia," and "pregnancy" remain important, complemented by "maternal" and "gestational," which reflect critical aspects of maternal health.
+
+Lastly, in **prostate cancer**, the top five overall words were "cancer," "prostate," "patients," "treatment," and "disease." In the TF-IDF analysis, "prostate" stands out, along with "androgen," "psa," "prostatectomy," and "castration." This reflects a focus on more specific treatments and biological factors relevant to prostate cancer research.
+
+Overall, the additional words identified in the TF-IDF analysis provide a clearer and more nuanced understanding of each disease area by focusing on terms that are specific to the research context, moving beyond general medical vocabulary to highlight critical aspects unique to each condition.
+
+## Sentiment Analysis
+
+1.  Perform a sentiment analysis using the NRC lexicon. What is the most common sentiment for each search term? What if you remove `"positive"` and `"negative"` from the list?
+
+```{r}
+library(textdata)
+
+# Load NRC sentiment lexicon
+nrc_sentiments <- get_sentiments("nrc")
+# Citation: 'http://saifmohammad.com/WebDocs/Lexicons/NRC-Emotion-Lexicon.zip'
+
+# Join with tokenized data to get sentiment classification
+sentiment_data <- tokenized_abstracts %>%
+    inner_join(nrc_sentiments, by = "word")
+
+# Count the most common sentiment for each search term
+common_sentiment <- sentiment_data %>%
+    count(term, sentiment, sort = TRUE) %>%
+    group_by(term) %>%
+    slice_max(n, n = 1) %>%
+    ungroup()
+
+datatable(common_sentiment, 
+          class = 'cell-border stripe',
+          options = list(pageLength = 10,         
+                         lengthMenu = c(5, 10, 20, 50), 
+                         searching = TRUE,      
+                         ordering = TRUE))
+
+# removing "positive" and "negative" sentiments
+filtered_sentiment_data <- sentiment_data %>%
+    filter(sentiment != "positive" & sentiment != "negative")
+
+# Count the most common sentiment for each search term excluding positive and negative
+common_sentiment_filtered <- filtered_sentiment_data %>%
+    count(term, sentiment, sort = TRUE) %>%
+    group_by(term) %>%
+    slice_max(n, n = 1) %>%
+    ungroup()
+
+datatable(common_sentiment_filtered, 
+          class = 'cell-border stripe',
+          options = list(pageLength = 10,         
+                         lengthMenu = c(5, 10, 20, 50), 
+                         searching = TRUE,      
+                         ordering = TRUE))
+```
+
+For the **COVID-19** search term, the most common sentiment is **positive**, with **9,874** occurrences, indicating a generally optimistic outlook. However, when examining the sentiments excluding "positive" and "negative," **fear** emerges as the predominant sentiment, with **7,730** mentions. 
+
+In the case of **cystic fibrosis**, the analysis also shows a predominant **positive** sentiment with **2,747** occurrences, which may relate to increased awareness and support for patients. Yet, without the "positive" and "negative" sentiments, **disgust** becomes the most common sentiment at **1,714** occurrences.
+
+For **meningitis**, the analysis reveals a **negative** sentiment as the most common, with **2,109** occurrences. When removing the "positive" and "negative" sentiments, **fear** stands out, with **1,510** mentions.
+
+Regarding **preeclampsia**, the sentiment is predominantly **positive** at **8,014** occurrences. Without the "positive" and "negative" sentiments, the leading sentiment shifts to **anticipation** with **4,780** occurrences.
+
+Lastly, for **prostate cancer**, the most common sentiment is **negative**, with **8,918** mentions. When excluding "positive" and "negative," **fear** is the most prevalent sentiment at **8,118** occurrences.
+
+Overall, the sentiment analysis highlights the complexities of emotional responses to these medical conditions, with fear and anticipation emerging as significant sentiments when the more binary positive and negative sentiments are removed. 
+
+2.  Now perform a sentiment analysis using the AFINN lexicon to get an average positivity score for each abstract (hint: you may want to create a variable that indexes, or counts, the abstracts). Create a visualization that shows these scores grouped by search term. Are any search terms noticeably different from the others?
+
+```{r}
+# Load the AFINN lexicon
+afinn <- get_sentiments("afinn")
+# Citation: http://www2.imm.dtu.dk/pubdb/views/publication_details.php?id=6010 
+
+# Abstract identifier
+abstracts <- abstracts %>%
+  mutate(abstract_id = row_number()) 
+
+# Tokenize the abstracts into words
+abstracts_tokens <- abstracts %>%
+  unnest_tokens(word, abstract)
+
+# Join with the AFINN lexicon to get sentiment scores
+sentiment_scores <- abstracts_tokens %>%
+  inner_join(afinn, by = "word") %>%
+  group_by(term, abstract_id) %>%  
+  summarise(average_score = mean(value, na.rm = TRUE), .groups = "drop")
+
+# Calculate average positivity score for each search term
+average_scores <- sentiment_scores %>%
+  group_by(term) %>%
+  summarise(overall_average = mean(average_score, na.rm = TRUE))
+
+# Create a visualization of average positivity scores
+# Define custom colors for each search term
+custom_colors <- c("covid" = "#4B0082",             
+                   "cystic fibrosis" = "#743089", 
+                   "meningitis" = "#A865B5",     
+                   "preeclampsia" = "#3E2F84",    
+                   "prostate cancer" = "#9467bd") 
+
+# Create the plot with custom colors
+ggplot(average_scores, aes(x = term, y = overall_average, fill = term)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Average Positivity Score by Search Term",
+       x = "Search Term",
+       y = "Average Positivity Score") +
+  scale_fill_manual(values = custom_colors) + 
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+Based on the average positivity scores derived from the AFINN lexicon, there are noticeable differences among the search terms. **Prostate cancer** has the most negative overall average score at **-0.2386**. Following closely, **meningitis** has an average score of **-0.1631**, also indicating a predominantly negative sentiment. **COVID** has an average score of **-0.1465**, showing a slightly negative sentiment as well. In contrast, **cystic fibrosis** stands out positively with an average score of **0.3224**, suggesting a more optimistic tone in the literature surrounding this condition. Meanwhile, **preeclampsia** shows a slightly negative sentiment with an average score of **-0.1210**, indicating challenges associated with pregnancy-related complications but is less negative than the scores for prostate cancer and meningitis. Overall, the data indicate that cystic fibrosis is perceived more positively in the literature compared to the other conditions, which exhibit negative sentiments. This stark contrast highlights the variability in how different medical conditions are discussed, with some being framed more positively due to advancements in treatment and awareness, while others reflect ongoing struggles and serious health implications.
