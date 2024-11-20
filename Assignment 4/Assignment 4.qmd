@@ -1,0 +1,171 @@
+---
+title: "Assignment 4 - HPC and SQL"
+author: "Hanin Almodaweb"
+format: html
+theme: journal
+embed-resources: true
+fig-width: 10
+fig-height: 6
+---
+
+```{r, message=FALSE, echo=FALSE, warning=FALSE, results='hide'}
+library(dplyr)
+library(tidyverse)
+library(microbenchmark)
+library(parallel)
+library(RSQLite)
+library(DBI)
+library(DT)
+```
+
+# HPC
+
+```{r}
+# Total Row Sums
+fun1 <- function(mat) {
+  n <- nrow(mat)
+  ans <- double(n) 
+  for (i in 1:n) {
+    ans[i] <- sum(mat[i, ])}
+  ans}
+
+fun1alt <- function(mat) {
+   rowSums(mat)
+}
+
+# Cumulative Sum by Row
+fun2 <- function(mat) {
+  n <- nrow(mat)
+  k <- ncol(mat)
+  ans <- mat
+  for (i in 1:n) {
+    for (j in 2:k) {
+      ans[i,j] <- mat[i, j] + ans[i, j - 1]}}
+  ans}
+
+fun2alt <- function(mat) {
+  t(apply(mat, 1, cumsum))}
+```
+
+## Question 1
+*Using the dataset generated below (`dat`), check that the output of both of your new functions matches the output of the original functions. Then use `microbenchmark` to check that your version is actually faster.*
+
+```{r}
+# Use the data with this code
+set.seed(2315)
+dat <- matrix(rnorm(200 * 100), nrow = 200)
+
+# Test for the first
+microbenchmark::microbenchmark(
+  fun1(dat),
+  fun1alt(dat), unit = "relative"
+)
+
+# Test for the second
+microbenchmark::microbenchmark(
+  fun2(dat),
+  fun2alt(dat), unit = "relative"
+)
+```
+
+```{r}
+# Make Things Run Faster with Parallel Computing
+sim_pi <- function(n = 1000, i = NULL) {
+  p <- matrix(runif(n*2), ncol = 2)
+  mean(rowSums(p^2) < 1) * 4}
+
+# Run Simulation Multiple Times (4,000 times)
+set.seed(1231)
+system.time({
+  ans <- unlist(lapply(1:4000, sim_pi, n = 10000))
+  print(mean(ans))})
+```
+
+## Question 2
+*Rewrite the previous code using `parLapply()` (or your parallelization method of choice) to parallelize it. Run the code once, using `system.time()`, to show that your version is faster.*
+
+```{r}
+# Parallelize Previous Code
+sim_pi <- function(i, n) {
+  x <- runif(n)
+  y <- runif(n)
+  pi_estimate <- mean((x^2 + y^2) <= 1) * 4
+  return(pi_estimate)}
+set.seed(1231)
+
+# Show Runtime
+system.time({
+  ans <- unlist(mclapply(1:4000, sim_pi, n = 10000, mc.cores = 4))
+  print(mean(ans))})
+```
+
+# SQL
+
+```{r}
+# Setup a temporary database 
+library(RSQLite)
+library(DBI)
+
+# Initialize a temporary in memory database
+con <- dbConnect(SQLite(), ":memory:")
+
+# Download tables
+film <- read.csv("https://raw.githubusercontent.com/ivanceras/sakila/master/csv-sakila-db/film.csv")
+film_category <- read.csv("https://raw.githubusercontent.com/ivanceras/sakila/master/csv-sakila-db/film_category.csv")
+category <- read.csv("https://raw.githubusercontent.com/ivanceras/sakila/master/csv-sakila-db/category.csv")
+
+# Copy data.frames to database
+dbWriteTable(con, "film", film)
+dbWriteTable(con, "film_category", film_category)
+dbWriteTable(con, "category", category)
+```
+
+## Question 3
+*How many movies are available in each `rating` category?*
+
+```{sql, connection=con}
+SELECT rating, COUNT(*) AS num_movies
+FROM film
+GROUP BY rating;
+```
+There are 180 G-rated movies, 210 NC-17 movies, 194 PG movies, 223 PG-13 movies, and 195 R-rated movies.
+
+## Question 4
+*What is the average replacement cost and rental rate for each `rating` category?*
+
+```{sql, connection=con}
+SELECT rating, 
+       AVG(replacement_cost) AS avg_replacement_cost, 
+       AVG(rental_rate) AS avg_rental_rate
+FROM film
+GROUP BY rating;
+```
+
+The average replacement cost for G-rated movies is 20.12, with an average rental rate of 2.91. NC-17 movies have an average replacement cost of 20.14 and a rental rate of 2.97. For PG movies, the average replacement cost is 18.96, and the rental rate is 3.05. PG-13 movies have an average replacement cost of 20.40 and a rental rate of 3.03. Lastly, R-rated movies have an average replacement cost of 20.23 and a rental rate of 2.94.
+
+## Question 5
+*Use table `film_category` together with `film` to find how many films there are with each category ID.*
+
+```{sql, connection=con}
+SELECT fc.category_id, COUNT(*) AS num_films
+FROM film_category AS fc
+INNER JOIN film AS f
+ON fc.film_id = f.film_id
+GROUP BY fc.category_id;
+```
+
+## Question 6
+*Incorporate the `category` table into the answer to the previous question to find the name of the most popular category.*
+
+```{sql, connection=con}
+SELECT c.name AS category_name, COUNT(*) AS num_films
+FROM film_category AS fc
+INNER JOIN film AS f
+ON fc.film_id = f.film_id
+INNER JOIN category AS c
+ON fc.category_id = c.category_id
+GROUP BY c.name
+ORDER BY num_films DESC
+LIMIT 1;
+```
+Sports is the most popular film category, with 74 films available.
